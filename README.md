@@ -23,6 +23,22 @@ Offline iOS app for tracking a USA coast-to-coast road trip — locations, photo
 
 All data is stored on-device (SwiftData + local photo files). Works fully offline after install.
 
+## Linux / CI validation
+
+A full build and run requires **Xcode on macOS** — the app is built on Apple-only
+frameworks (SwiftUI, SwiftData, MapKit, CoreLocation, PhotosUI, UIKit). It cannot
+be compiled on Linux.
+
+For Linux environments (CI, Cloud Agents) the open-source Swift toolchain can still
+syntax-check and style-lint the sources:
+
+```sh
+scripts/cloud-setup.sh   # install the Swift toolchain (idempotent)
+scripts/check-swift.sh   # parse every .swift file + swift-format lint
+```
+
+Style rules live in `.swift-format`.
+
 ## Privacy
 
 The app requests:
