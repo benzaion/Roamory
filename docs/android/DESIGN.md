@@ -10,6 +10,8 @@ This document is the design source of truth for the first Android build. A click
 
 The iOS app is a **single-trip, on-device journal**. It seeds one trip (`Coast to Coast 2026`) and never shows a trip picker. All data stays on device (SwiftData + local JPEGs). There is no account, sync, or social layer.
 
+Android **keeps the same on-device model** but promotes `Trip` to a first-class object: users can start, open, rename, and delete many trips. The Home / Map / Timeline workspace is scoped to the trip they opened.
+
 ### iOS information architecture
 
 ```
@@ -68,35 +70,35 @@ Miles are the sum of consecutive stop-to-stop distances. Highlights do not contr
 1. **One-handed field use.** Check-in is the most frequent action. FAB, current-location, and Save stay in the thumb zone.
 2. **Offline by default.** No account wall, no network required after install. Maps degrade to last-known camera + cached tiles when offline.
 3. **Permission just-in-time.** Never prompt on first launch. Ask at the moment the user taps *Use current location* or *Take photo*, with an in-app rationale first.
-4. **Don’t invent a second product.** v1 matches iOS capability. Android-native extras below are marked **Recommended** and can ship in the same build if you want them; they do not change the data model.
+4. **Android-correct extras stay.** Search, filter chips, settings, photo captions, a miles/km toggle, and a Google Maps directions outlink ship in v1. They use fields the iOS model already has.
 5. **Material You, not a skin.** Dynamic color is on; the iOS accent `#3A72FB` is the fallback seed so brand stays recognizable on devices without wallpaper theming.
 
 ---
 
-## 3. Assumptions locked for this design
+## 3. Decisions locked for this design
 
-These match the current iOS product. Questions that would change the design are in [§12](#12-questions-for-you).
+Answered in review. The prototype matches these.
 
-- **Single trip.** App still seeds `Coast to Coast 2026` on first launch. No trip list.
-- **Feature parity first.** Stops, highlights, map, timeline, photos, notes, ratings, categories, local storage.
-- **Imperial distance.** Miles, same formula as iOS.
+- **Many trips.** Root is a trip list. First launch is an empty list with **Start a trip** — Android does not auto-seed `Coast to Coast 2026`. The iOS `Trip` model already supports this; the iOS UI never exposed it.
+- **Google Maps.** Maps Compose + Play Services. Marker **Directions** opens a Google Maps geo intent. CoastTrip data never leaves the device.
+- **Android extras in v1.** Search, filter chips, settings, photo captions, dedicated edit routes.
+- **Miles and kilometers.** App-level setting (DataStore). Default follows the device locale (`US` → miles). Home, trip cards, and any distance copy use the same stop-to-stop formula as iOS; only the unit label and conversion change (`km = mi × 1.60934`).
 - **Kotlin + Jetpack Compose + Material 3.** Not Flutter, not a WebView wrapper.
-- **Google Maps Compose** for the map surface (Play Services). Offline tile cache is best-effort.
 - **minSdk 29 / targetSdk 36.** Photo Picker, predictive back, and edge-to-edge without large compat shims.
 - **Portrait primary** on phone (matches iOS). Landscape and inner-display layouts supported on large screens.
 - **No accounts, no cloud, no sharing** in v1.
 
-### Recommended Android-only additions (same data model)
-
-These are in the prototype because they are the Android-correct way to handle growing trip data. They can be cut without redesigning the rest.
+### Android-only surfaces (same data model)
 
 | Addition | Why it is Android-correct |
 |---|---|
-| Filter chips on Map and Timeline | Material way to scan a long trip without extra tabs |
-| Top app bar search on Timeline | Standard pattern once a journal has dozens of days |
-| Settings (trip title, theme, units display) | iOS never exposed `Trip.notes` / `endDate`; Android needs a place for app settings |
+| Trip list + Start a trip | Material root for a many-object journal; iOS hid this |
+| Filter chips on Map and Timeline | Scan a long trip without extra tabs |
+| Top app bar search on Timeline and the trip list | Standard once the journal has many days or trips |
+| Settings (trip metadata, theme, units) | iOS never exposed `Trip.notes` / `endDate` or a unit toggle |
 | Photo captions on the viewer | Field already exists on `TripPhoto` |
 | Dedicated overflow → Edit / Delete | Replaces iOS toolbar Delete sitting next to Edit |
+| Directions → Google Maps | System maps app is the Android way to navigate there |
 
 ---
 
@@ -165,14 +167,17 @@ Do not use iOS-style large-title + inline title stacking. Home uses a **medium c
 
 ```
 CoastTripApp
-└── NavigationSuiteScaffold
-    ├── HomeRoute
-    │     ├── StopDetail / HighlightDetail
-    │     └── Settings
-    ├── MapRoute
-    │     └── Marker sheet → StopDetail / HighlightDetail
-    └── TimelineRoute
-          └── StopDetail / HighlightDetail
+└── TripListRoute                         root; no bottom nav
+    ├── CreateTripRoute / EditTripRoute
+    ├── AppSettingsRoute                  units, theme, privacy
+    └── TripWorkspace                     NavigationSuiteScaffold
+        ├── HomeRoute
+        │     ├── StopDetail / HighlightDetail
+        │     └── TripSettingsRoute       rename, notes, end date
+        ├── MapRoute
+        │     └── Marker sheet → StopDetail / HighlightDetail
+        └── TimelineRoute
+              └── StopDetail / HighlightDetail
 
 Global (not in the tab back stack)
 ├── AddStopRoute          full-screen
@@ -181,6 +186,8 @@ Global (not in the tab back stack)
 ├── EditHighlightRoute
 └── PhotoViewerRoute      horizontal pager
 ```
+
+Predictive back from Home / Map / Timeline returns to the trip list. The last opened `tripId` is remembered in DataStore so a process death restores that workspace, not an empty list.
 
 ### Bottom navigation (phone)
 
@@ -213,6 +220,33 @@ Opening the menu dims the scrim. Back / tap-outside collapses it (predictive bac
 
 ## 6. Screen specifications
 
+### 6.0 Trips — root list
+
+**Job:** pick a trip or start a new one.
+
+**Layout**
+
+1. TopAppBar “Trips”
+   - Search (filters title and notes)
+   - Settings (app-level: units, theme, privacy)
+2. Vertical list of trip cards, newest start date first
+   - Title
+   - Date range (`startDate` → `endDate` or “Open”)
+   - Supporting stats: stop count · highlight count · distance in the current unit
+   - Overflow: Edit trip, Delete trip
+3. Empty: illustrated “No trips yet” + filled **Start a trip**
+4. FAB **Start a trip** (`add`) — single action, not a menu
+
+**Create / edit trip** (full-screen form)
+
+- Title (required)
+- Start date
+- End date (optional)
+- Notes (optional) — this is `Trip.notes`, unused on iOS
+- Save disabled until title is non-blank
+- After create: open that trip’s Home (empty workspace)
+- Delete: `AlertDialog` “Delete this trip? Stops, highlights, and photos will be removed from the device.”
+
 ### 6.1 Home — trip dashboard
 
 **Job:** answer “where is this trip at?” and start a check-in in one tap.
@@ -220,9 +254,10 @@ Opening the menu dims the scrim. Back / tap-outside collapses it (predictive bac
 **Layout (top → bottom)**
 
 1. Collapsing TopAppBar
+   - Leading: Up → trip list
    - Expanded: trip title, start date as supporting text
-   - Actions: overflow `settings`
-2. 2×2 stat grid — Stops, Highlights, Photos, Miles
+   - Actions: trip settings (rename, notes, dates)
+2. 2×2 stat grid — Stops, Highlights, Photos, Miles **or** Kilometers
    - Filled tonal cards, 16 dp, icon in category color, value in title-large, label in label-medium
    - Cards are **not** tappable in v1 (stats are summary only)
 3. Section header **Recent activity**
@@ -230,8 +265,6 @@ Opening the menu dims the scrim. Back / tap-outside collapses it (predictive bac
 5. Empty state when both collections are empty (see §8)
 
 **Not on this screen:** the iOS stacked “Add Stop / Add Highlight” buttons. Replaced by the FAB menu.
-
-**Overflow → Settings** is new vs iOS and is the only place to rename the trip.
 
 ### 6.2 Map — route canvas
 
@@ -257,7 +290,7 @@ Opening the menu dims the scrim. Back / tap-outside collapses it (predictive bac
 
 **Marker tap**
 
-1. Sheet peeks at ~40% with name, category/time, first photo, and two actions: **Open** / **Directions** (Directions is Recommended; opens Google Maps geo intent, does not leave CoastTrip data)
+1. Sheet peeks at ~40% with name, category/time, first photo, and two actions: **Open** / **Directions**. Directions fires a Google Maps geo intent (`google.navigation:q=lat,lng` with a `geo:` fallback). CoastTrip data stays on device.
 2. Drag or tap **Open** → full `StopDetail` / `HighlightDetail`
 3. Scrim tap or predictive back dismisses the sheet; map camera stays put
 
@@ -354,17 +387,21 @@ Full-screen, edge-to-edge, horizontal pager.
 - Bottom scrim: caption (Recommended; empty shows “Add a caption” in edit)
 - System bars dark / light icons invert over the photo
 
-### 6.8 Settings (Recommended)
+### 6.8 Settings
 
-Reached from Home overflow.
+**App settings** (from the trip list)
 
-- Trip name
-- Trip notes (`Trip.notes`, unused on iOS)
-- Start date (read-only in v1 unless you want an editor)
+- Distance: segmented button **Miles | Kilometers** (DataStore; default from locale)
 - Appearance: Follow system / Light / Dark
 - Dynamic color switch (Android 12+)
-- Distance: Miles (locked for v1 unless you choose a toggle)
 - About: version, privacy one-liner (“All trip data stays on this device.”)
+
+**Trip settings** (from Home)
+
+- Trip name
+- Trip notes
+- Start date / optional end date
+- Delete trip (same confirm as the list overflow)
 
 ---
 
@@ -374,16 +411,31 @@ Reached from Home overflow.
 
 ```mermaid
 flowchart TD
-  A[Process start] --> B[Room empty?]
-  B -->|yes| C[Seed trip Coast to Coast 2026]
-  B -->|no| D[Load existing trip]
-  C --> E[Home empty state]
-  D --> F[Home with stats]
-  E --> G[No system permission prompts]
-  F --> G
+  A[Process start] --> B[Remembered tripId?]
+  B -->|yes and still exists| C[Open that trip workspace]
+  B -->|no or missing| D[Trip list]
+  D --> E{Any trips?}
+  E -->|no| F[Empty list + Start a trip]
+  E -->|yes| G[Trip cards]
+  F --> H[No system permission prompts]
+  G --> H
+  C --> H
 ```
 
-No onboarding carousel. The empty state **is** the onboarding.
+No onboarding carousel. The empty trip list **is** the onboarding. Android does not auto-insert a coast-to-coast seed trip.
+
+### Start or open a trip
+
+```mermaid
+flowchart TD
+  A[Trip list] --> B{Start or open?}
+  B -->|Start a trip| C[Create form]
+  C --> D[Save]
+  D --> E[Empty Home for that trip]
+  B -->|Open card| F[That trip workspace]
+  F --> G[Home Map Timeline]
+  G --> H[Up returns to list]
+```
 
 ### Log a stop from the car
 
@@ -452,7 +504,8 @@ flowchart TD
 
 | Surface | Headline | Supporting | Action |
 |---|---|---|---|
-| Home | No stops yet | Log a stop or highlight as you drive. Everything stays on this device. | Log stop (filled) |
+| Trip list | No trips yet | Start a trip, then log stops as you drive. Everything stays on this device. | Start a trip |
+| Home | No stops yet | Log a stop or highlight as you drive. | Log stop (filled) |
 | Timeline | No entries yet | Stops and highlights show up here by day. | Log stop |
 | Map | *(no card)* | Continental US camera, no markers | FAB still available |
 | Photo grid | Hidden | Section omitted when count is 0 | Add only in edit/create |
@@ -533,26 +586,26 @@ Not this PR — captured so the UX does not fight the architecture later.
 - UI: Jetpack Compose, Material 3 (`androidx.compose.material3`)
 - Navigation: Navigation Compose + `NavigationSuiteScaffold`
 - DI: Hilt
-- Persistence: Room + DataStore (theme / dynamic color)
+- Persistence: Room + DataStore (theme, dynamic color, units, last `tripId`)
 - Maps: Maps Compose + Play Services Location
 - Images: Coil
 - Camera: CameraX
 - Adaptive: `material3-adaptive-navigation-suite`
 
-Package sketch: `com.coasttrip.app` with `data`, `location`, `photos`, `ui.home`, `ui.map`, `ui.timeline`, `ui.stop`, `ui.highlight`, `ui.settings`.
+Package sketch: `com.coasttrip.app` with `data`, `location`, `photos`, `ui.trips`, `ui.home`, `ui.map`, `ui.timeline`, `ui.stop`, `ui.highlight`, `ui.settings`.
 
 ---
 
-## 12. Questions for you
+## 12. Locked product answers
 
-Answer these and the design can be locked for implementation. Defaults used in the prototype are in parentheses.
-
-1. **Single trip or many?** Stay with one seeded coast-to-coast trip (default), or should Android launch with a trip list / “start a new trip”?
-2. **Maps provider?** Google Maps + Play Services (default), or MapLibre/OSM so the app can ship without a Google API key and work better on devices without Play?
-3. **v1 extras?** Keep the Recommended items (search, filter chips, settings, captions), or strip to strict iOS parity?
-4. **Units?** Miles only (default), or a Settings toggle for kilometers?
-5. **Directions outlink?** Marker sheet “Directions” opens Google Maps — keep, or stay 100% inside CoastTrip?
-6. **After you review this:** start the Kotlin/Compose project in this repo, or revise the prototype first?
+| Question | Decision |
+|---|---|
+| Single trip or many? | **Many.** Trip list is the root. |
+| Maps provider? | **Google Maps** + Play Services. |
+| v1 extras? | **Keep** search, chips, settings, captions. |
+| Units? | **Both.** Miles / Kilometers in Settings. |
+| Directions? | **Google Maps** geo intent. |
+| Next step after this revision? | Stay on the prototype until the trip-list pass is reviewed; then Kotlin. |
 
 ---
 
@@ -560,16 +613,17 @@ Answer these and the design can be locked for implementation. Defaults used in t
 
 Open [`prototype/index.html`](prototype/index.html) in a browser. It is a phone-framed, clickable pass through:
 
-- Home with stats and recent activity
+- Trip list (three sample trips) and first-launch empty list
+- Start / edit / delete a trip
+- Home / Map / Timeline scoped to the open trip
+- Miles ↔ kilometers in Settings
 - FAB menu → Log stop / Add highlight
 - Add Stop (location, notes, photos, validation)
 - Add Highlight (category chips, stars)
-- Map with filters, markers, and peek sheet
+- Map with filters, markers, peek sheet, and Directions → Google Maps
 - Timeline by day
 - Stop and Highlight details, overflow edit/delete
-- Delete confirmation
 - Location rationale
-- Settings
 - Light / dark theme toggle
 
-Sample journal data is a fictional Sep 2026 coast-to-coast drive so every surface has content. Use **Empty trip** in the prototype toolbar to see first-launch states.
+The prototype ships with sample trips so every surface has content. Use **Empty list** in the prototype toolbar to see first launch. Use **Reset** to restore the samples.

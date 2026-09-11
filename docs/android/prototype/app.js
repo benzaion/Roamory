@@ -123,6 +123,90 @@ const seedHighlights = [
   },
 ];
 
+const seedPnwStops = [
+  {
+    id: "p1",
+    placeName: "Pike Place Market",
+    lat: 47.6097,
+    lng: -122.3425,
+    timestamp: "2026-07-12T09:10:00",
+    notes: "Coffee and the first hill of the week.",
+    photo: photos.nashville,
+    x: 22,
+    y: 28,
+  },
+  {
+    id: "p2",
+    placeName: "Cannon Beach",
+    lat: 45.8918,
+    lng: -123.9615,
+    timestamp: "2026-07-16T17:45:00",
+    notes: "Haystack at low tide. Overnight in town.",
+    photo: photos.pier,
+    x: 18,
+    y: 48,
+  },
+  {
+    id: "p3",
+    placeName: "Portland",
+    lat: 45.5152,
+    lng: -122.6784,
+    timestamp: "2026-07-18T12:05:00",
+    notes: "Loop closed. Food carts before the airport.",
+    photo: photos.bbq,
+    x: 28,
+    y: 52,
+  },
+];
+
+const seedPnwHighlights = [
+  {
+    id: "ph1",
+    name: "Hoh Rain Forest",
+    category: "Scenic",
+    rating: 5,
+    lat: 47.8606,
+    lng: -123.9347,
+    timestamp: "2026-07-14T11:20:00",
+    notes: "Moss so thick the trail felt indoor.",
+    photo: photos.flagstaff,
+    x: 14,
+    y: 36,
+  },
+];
+
+function createSeedTrips() {
+  return [
+    {
+      id: "t1",
+      title: "Coast to Coast 2026",
+      startDate: "2026-09-01",
+      endDate: null,
+      notes: "USA coast-to-coast road trip",
+      stops: structuredClone(seedStops),
+      highlights: structuredClone(seedHighlights),
+    },
+    {
+      id: "t2",
+      title: "Pacific Northwest Loop",
+      startDate: "2026-07-12",
+      endDate: "2026-07-18",
+      notes: "Seattle to Portland via the Olympics",
+      stops: structuredClone(seedPnwStops),
+      highlights: structuredClone(seedPnwHighlights),
+    },
+    {
+      id: "t3",
+      title: "Utah Parks",
+      startDate: "2026-10-03",
+      endDate: null,
+      notes: "Planned — nothing logged yet.",
+      stops: [],
+      highlights: [],
+    },
+  ];
+}
+
 const categoryMeta = {
   Scenic: { icon: "eco", tint: "scenic", cls: "cat-scenic" },
   Food: { icon: "restaurant", tint: "food", cls: "cat-food" },
@@ -133,27 +217,41 @@ const categoryMeta = {
 
 const state = {
   theme: "light",
-  empty: false,
+  emptyList: false,
+  units: "mi",
   tab: "home",
-  screen: "home",
+  screen: "trips",
   fabOpen: false,
   mapFilter: "All",
   timelineFilter: "All",
   timelineQuery: "",
+  tripQuery: "",
   selectedStopId: null,
   selectedHighlightId: null,
   sheetId: null,
   sheetKind: null,
   dialog: null,
+  pendingDeleteTripId: null,
   snack: null,
   photo: null,
   locationGranted: false,
   stopForm: blankStopForm(),
   highlightForm: blankHighlightForm(),
-  stops: structuredClone(seedStops),
-  highlights: structuredClone(seedHighlights),
-  tripTitle: "Coast to Coast 2026",
+  tripForm: blankTripForm(),
+  trips: createSeedTrips(),
+  currentTripId: null,
 };
+
+function blankTripForm() {
+  return {
+    title: "",
+    startDate: "2026-09-11",
+    endDate: "",
+    notes: "",
+    dirty: false,
+    editingId: null,
+  };
+}
 
 function blankStopForm() {
   return {
@@ -206,14 +304,47 @@ function fmtCoord(lat, lng) {
   return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
 }
 
-function miles() {
-  const sorted = [...state.stops].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+function currentTrip() {
+  return state.trips.find((trip) => trip.id === state.currentTripId) || null;
+}
+
+function tripStops() {
+  return currentTrip()?.stops ?? [];
+}
+
+function tripHighlights() {
+  return currentTrip()?.highlights ?? [];
+}
+
+function tripDistanceMiles(trip) {
+  const sorted = [...(trip?.stops ?? [])].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   if (sorted.length < 2) return 0;
   let total = 0;
   for (let i = 1; i < sorted.length; i += 1) {
     total += haversine(sorted[i - 1], sorted[i]);
   }
-  return Math.round(total);
+  return total;
+}
+
+function formatDistance(milesValue) {
+  if (state.units === "km") {
+    return { value: Math.round(milesValue * 1.60934), label: "Kilometers" };
+  }
+  return { value: Math.round(milesValue), label: "Miles" };
+}
+
+function formatTripDates(trip) {
+  const start = new Date(`${trip.startDate}T12:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  if (!trip.endDate) return `${start} · Open`;
+  const end = new Date(`${trip.endDate}T12:00:00`).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return `${start} – ${end}`;
 }
 
 function haversine(a, b) {
@@ -229,7 +360,7 @@ function haversine(a, b) {
 }
 
 function activityItems() {
-  const stops = state.stops.map((s) => ({
+  const stops = tripStops().map((s) => ({
     kind: "stop",
     id: s.id,
     title: s.placeName || "Stop",
@@ -238,7 +369,7 @@ function activityItems() {
     icon: "location_on",
     tint: "stop",
   }));
-  const highlights = state.highlights.map((h) => ({
+  const highlights = tripHighlights().map((h) => ({
     kind: "highlight",
     id: h.id,
     title: h.name,
@@ -255,13 +386,17 @@ function render() {
   document.getElementById("toggleTheme").textContent =
     state.theme === "dark" ? "Light theme" : "Dark theme";
   document.getElementById("toggleTheme").setAttribute("aria-pressed", String(state.theme === "dark"));
-  document.getElementById("toggleEmpty").setAttribute("aria-pressed", String(state.empty));
+  document.getElementById("toggleEmpty").setAttribute("aria-pressed", String(state.emptyList));
   $app().innerHTML = screenHtml() + overlaysHtml();
   bindStatic();
 }
 
 function screenHtml() {
   switch (state.screen) {
+    case "trips":
+      return tripsHtml();
+    case "createTrip":
+      return createTripHtml();
     case "addStop":
       return addStopHtml();
     case "addHighlight":
@@ -315,26 +450,114 @@ function fabHtml() {
     </button>`;
 }
 
-function homeHtml() {
-  const empty = state.empty || (state.stops.length === 0 && state.highlights.length === 0);
-  const recent = activityItems().slice(0, 5);
+function tripsHtml() {
+  const query = state.tripQuery.toLowerCase();
+  const trips = state.trips
+    .filter((trip) => `${trip.title} ${trip.notes}`.toLowerCase().includes(query))
+    .sort((a, b) => b.startDate.localeCompare(a.startDate));
   return `
     <section class="screen">
       <div class="app-bar">
         <div style="width:48px"></div>
+        <h1>Trips</h1>
+        <button class="icon-btn" data-go="settings" aria-label="Settings">${icon("settings")}</button>
+      </div>
+      <div class="search-field field">
+        <input id="tripSearch" type="search" placeholder="Search trips…" value="${escapeHtml(state.tripQuery)}" />
+      </div>
+      <div class="scroll">
+        ${
+          state.trips.length === 0
+            ? `<div class="empty">
+                ${icon("map")}
+                <h3>No trips yet</h3>
+                <p>Start a trip, then log stops as you drive. Everything stays on this device.</p>
+                <button class="filled" data-create-trip>Start a trip</button>
+              </div>`
+            : trips.length === 0
+              ? `<div class="empty"><h3>No matches</h3><p>Try another search.</p></div>`
+              : trips.map(tripCard).join("")
+        }
+      </div>
+      ${
+        state.trips.length
+          ? `<button class="fab list-fab" data-create-trip aria-label="Start a trip">${icon("add")}</button>`
+          : ""
+      }
+    </section>`;
+}
+
+function tripCard(trip) {
+  const distance = formatDistance(tripDistanceMiles(trip));
+  return `
+    <article class="trip-card">
+      <div class="trip-card-top">
+        <button class="trip-open" data-open-trip="${trip.id}">
+          <strong>${escapeHtml(trip.title)}</strong>
+          <span>${formatTripDates(trip)}</span>
+        </button>
+        <button class="icon-btn" data-trip-overflow="${trip.id}" aria-label="Trip options">${icon("more_vert")}</button>
+      </div>
+      <p class="trip-meta">${trip.stops.length} stops · ${trip.highlights.length} highlights · ${distance.value} ${distance.label.toLowerCase()}</p>
+    </article>`;
+}
+
+function createTripHtml() {
+  const f = state.tripForm;
+  const canSave = f.title.trim().length > 0;
+  return `
+    <section class="screen">
+      <div class="app-bar">
+        <button class="icon-btn" data-close-trip-form aria-label="Close">${icon("close")}</button>
+        <h1>${f.editingId ? "Edit trip" : "Start a trip"}</h1>
+        <button class="text-btn" data-save-trip ${canSave ? "" : "disabled"}>Save</button>
+      </div>
+      <div class="scroll tight">
+        <div class="form">
+          <div class="field">
+            <label for="newTripTitle">Trip name</label>
+            <input id="newTripTitle" value="${escapeHtml(f.title)}" placeholder="Required" />
+          </div>
+          <div class="field">
+            <label for="newTripStart">Start date</label>
+            <input id="newTripStart" type="date" value="${escapeHtml(f.startDate)}" />
+          </div>
+          <div class="field">
+            <label for="newTripEnd">End date</label>
+            <input id="newTripEnd" type="date" value="${escapeHtml(f.endDate)}" />
+          </div>
+          <div class="field">
+            <label for="newTripNotes">Notes</label>
+            <textarea id="newTripNotes" placeholder="Optional">${escapeHtml(f.notes)}</textarea>
+          </div>
+        </div>
+      </div>
+    </section>`;
+}
+
+function homeHtml() {
+  const trip = currentTrip();
+  if (!trip) return tripsHtml();
+  const empty = trip.stops.length === 0 && trip.highlights.length === 0;
+  const recent = activityItems().slice(0, 5);
+  const distance = formatDistance(tripDistanceMiles(trip));
+  return `
+    <section class="screen">
+      <div class="app-bar">
+        <button class="icon-btn" data-back-trips aria-label="All trips">${icon("arrow_back")}</button>
         <h1>Trip</h1>
         <button class="icon-btn" data-go="settings" aria-label="Settings">${icon("settings")}</button>
       </div>
       <div class="hero">
-        <h2>${escapeHtml(state.tripTitle)}</h2>
-        <p class="kicker">Started Sep 1, 2026</p>
+        <h2>${escapeHtml(trip.title)}</h2>
+        <p class="kicker">${formatTripDates(trip)}</p>
       </div>
       <div class="scroll">
         <div class="stats">
-          ${statCard("location_on", empty ? 0 : state.stops.length, "Stops")}
-          ${statCard("star", empty ? 0 : state.highlights.length, "Highlights")}
-          ${statCard("photo", empty ? 0 : activityItems().length, "Photos")}
-          ${statCard("route", empty ? 0 : miles(), "Miles")}
+          ${statCard("location_on", trip.stops.length, "Stops")}
+          ${statCard("star", trip.highlights.length, "Highlights")}
+          ${statCard("photo", activityItems().length, "Photos")}
+          ${statCard("route", empty ? 0 : distance.value, distance.label)}
         </div>
         ${
           empty
@@ -390,7 +613,7 @@ function mapHtml() {
     state.mapFilter === "Highlights" ||
     ["Scenic", "Food", "Lodging", "Landmark", "Other"].includes(state.mapFilter);
 
-  const stopPins = (state.empty ? [] : state.stops)
+  const stopPins = tripStops()
     .filter(() => showStops)
     .map(
       (s) => `
@@ -400,7 +623,7 @@ function mapHtml() {
     )
     .join("");
 
-  const highlightPins = (state.empty ? [] : state.highlights)
+  const highlightPins = tripHighlights()
     .filter((h) => showHighlights && (state.mapFilter === "All" || state.mapFilter === "Highlights" || h.category === state.mapFilter))
     .map((h) => {
       const meta = categoryMeta[h.category];
@@ -411,10 +634,8 @@ function mapHtml() {
     })
     .join("");
 
-  const points = [...state.stops].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  const path = state.empty
-    ? ""
-    : points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const points = [...tripStops()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 
   return `
     <section class="screen map-screen">
@@ -449,8 +670,8 @@ function sheetHtml() {
   if (!state.sheetId) return "";
   const item =
     state.sheetKind === "stop"
-      ? state.stops.find((s) => s.id === state.sheetId)
-      : state.highlights.find((h) => h.id === state.sheetId);
+      ? tripStops().find((s) => s.id === state.sheetId)
+      : tripHighlights().find((h) => h.id === state.sheetId);
   if (!item) return "";
   const title = item.placeName || item.name;
   const support =
@@ -469,20 +690,20 @@ function sheetHtml() {
       </div>
       <div class="sheet-actions">
         <button class="filled" data-open="${state.sheetKind}:${item.id}">Open</button>
-        <button class="outline" data-snack="Directions would open in Google Maps">Directions</button>
+        <button class="outline" data-directions="${item.lat},${item.lng}">Directions</button>
       </div>
     </aside>`;
 }
 
 function timelineHtml() {
-  const empty = state.empty || activityItems().length === 0;
+  const empty = activityItems().length === 0;
   const q = state.timelineQuery.toLowerCase();
   let items = activityItems().map((item) => {
     if (item.kind === "stop") {
-      const stop = state.stops.find((s) => s.id === item.id);
+      const stop = tripStops().find((s) => s.id === item.id);
       return { ...item, subtitle: fmtCoord(stop.lat, stop.lng), notes: stop.notes };
     }
-    const highlight = state.highlights.find((h) => h.id === item.id);
+    const highlight = tripHighlights().find((h) => h.id === item.id);
     return { ...item, subtitle: highlight.category, notes: highlight.notes };
   });
   if (state.timelineFilter === "Stops") items = items.filter((i) => i.kind === "stop");
@@ -691,7 +912,7 @@ function addHighlightHtml() {
 }
 
 function stopDetailHtml() {
-  const stop = state.stops.find((s) => s.id === state.selectedStopId);
+  const stop = tripStops().find((s) => s.id === state.selectedStopId);
   if (!stop) return homeHtml();
   return `
     <section class="screen">
@@ -726,7 +947,7 @@ function stopDetailHtml() {
 }
 
 function highlightDetailHtml() {
-  const highlight = state.highlights.find((h) => h.id === state.selectedHighlightId);
+  const highlight = tripHighlights().find((h) => h.id === state.selectedHighlightId);
   if (!highlight) return homeHtml();
   const meta = categoryMeta[highlight.category];
   return `
@@ -769,6 +990,7 @@ function highlightDetailHtml() {
 }
 
 function settingsHtml() {
+  const trip = currentTrip();
   return `
     <section class="screen">
       <div class="app-bar">
@@ -777,17 +999,33 @@ function settingsHtml() {
       </div>
       <div class="scroll tight">
         <div class="form">
-          <div class="field">
-            <label for="tripTitle">Trip name</label>
-            <input id="tripTitle" value="${escapeHtml(state.tripTitle)}" />
+          ${
+            trip
+              ? `<div class="field">
+                  <label for="tripTitle">Trip name</label>
+                  <input id="tripTitle" value="${escapeHtml(trip.title)}" />
+                </div>
+                <div class="field">
+                  <label for="tripNotes">Trip notes</label>
+                  <textarea id="tripNotes">${escapeHtml(trip.notes)}</textarea>
+                </div>`
+              : ""
+          }
+          <div class="card">
+            <p class="section-title">Distance</p>
+            <div class="segmented" role="group" aria-label="Distance unit">
+              <button class="${state.units === "mi" ? "active" : ""}" data-units="mi">Miles</button>
+              <button class="${state.units === "km" ? "active" : ""}" data-units="km">Kilometers</button>
+            </div>
+            <p class="muted" style="margin-top:8px">Same stop-to-stop formula as iOS. Highlights do not add distance.</p>
           </div>
           <div class="card">
             <p class="section-title">Appearance</p>
-            <p class="muted">Follows this prototype’s theme control for now. The app will honor system light/dark and Material You dynamic color.</p>
+            <p class="muted">Use the prototype toolbar for light/dark. The app will honor system theme and Material You dynamic color.</p>
           </div>
           <div class="card">
-            <p class="section-title">Distance</p>
-            <p class="muted">Miles — same formula as iOS (stop-to-stop only).</p>
+            <p class="section-title">Maps</p>
+            <p class="muted">Google Maps for the route canvas. Directions opens the Google Maps app with this pin.</p>
           </div>
           <div class="card">
             <p class="section-title">Privacy</p>
@@ -813,6 +1051,22 @@ function overlaysHtml() {
           <span class="bubble">${icon("star")}</span>
         </button>
       </div>`;
+  }
+  if (state.dialog === "trip-overflow") {
+    html += dialog(
+      "Trip",
+      "Rename this trip or remove it from the device.",
+      `<button class="text-btn" data-edit-trip>Edit</button>
+       <button class="text-btn danger" data-dialog="delete-trip">Delete</button>`
+    );
+  }
+  if (state.dialog === "delete-trip") {
+    html += dialog(
+      "Delete this trip?",
+      "Stops, highlights, and photos for this trip will be removed from the device.",
+      `<button class="text-btn" data-dialog-cancel>Cancel</button>
+       <button class="text-btn danger" data-confirm-delete-trip>Delete</button>`
+    );
   }
   if (state.dialog === "location") {
     html += dialog(
@@ -927,7 +1181,11 @@ function bindStatic() {
   });
   $app().querySelectorAll("[data-back]").forEach((el) => {
     el.addEventListener("click", () => {
-      state.screen = "home";
+      if (state.screen === "settings" && !state.currentTripId) {
+        state.screen = "trips";
+      } else {
+        state.screen = "home";
+      }
       state.sheetId = null;
       render();
     });
@@ -1071,17 +1329,16 @@ function bindStatic() {
         x: 50,
         y: 46,
       };
-      const existing = state.stops.find((s) => s.id === id);
+      const existing = tripStops().find((s) => s.id === id);
       if (existing) {
         Object.assign(existing, next, { timestamp: existing.timestamp, x: existing.x, y: existing.y });
         state.selectedStopId = id;
         state.screen = "stopDetail";
       } else {
-        state.stops.push(next);
+        currentTrip().stops.push(next);
         state.screen = "home";
         state.tab = "home";
       }
-      state.empty = false;
       state.snack = { text: existing ? "Stop updated" : "Stop saved", action: "View", id, kind: "stop" };
       render();
       window.setTimeout(() => {
@@ -1109,17 +1366,16 @@ function bindStatic() {
         x: 54,
         y: 42,
       };
-      const existing = state.highlights.find((h) => h.id === id);
+      const existing = tripHighlights().find((h) => h.id === id);
       if (existing) {
         Object.assign(existing, next, { timestamp: existing.timestamp, x: existing.x, y: existing.y });
         state.selectedHighlightId = id;
         state.screen = "highlightDetail";
       } else {
-        state.highlights.push(next);
+        currentTrip().highlights.push(next);
         state.screen = "home";
         state.tab = "home";
       }
-      state.empty = false;
       state.snack = { text: existing ? "Highlight updated" : "Highlight saved", action: "View", id, kind: "highlight" };
       render();
     });
@@ -1154,7 +1410,7 @@ function bindStatic() {
     el.addEventListener("click", () => {
       state.dialog = null;
       if (el.dataset.edit === "stop") {
-        const stop = state.stops.find((s) => s.id === state.selectedStopId);
+        const stop = tripStops().find((s) => s.id === state.selectedStopId);
         if (!stop) return;
         state.stopForm = {
           placeName: stop.placeName,
@@ -1167,7 +1423,7 @@ function bindStatic() {
         };
         state.screen = "addStop";
       } else {
-        const highlight = state.highlights.find((h) => h.id === state.selectedHighlightId);
+        const highlight = tripHighlights().find((h) => h.id === state.selectedHighlightId);
         if (!highlight) return;
         state.highlightForm = {
           name: highlight.name,
@@ -1203,10 +1459,10 @@ function bindStatic() {
   $app().querySelectorAll("[data-confirm-delete]").forEach((el) => {
     el.addEventListener("click", () => {
       if (el.dataset.confirmDelete === "stop") {
-        state.stops = state.stops.filter((s) => s.id !== state.selectedStopId);
+        currentTrip().stops = currentTrip().stops.filter((s) => s.id !== state.selectedStopId);
         state.snack = { text: "Stop deleted" };
       } else {
-        state.highlights = state.highlights.filter((h) => h.id !== state.selectedHighlightId);
+        currentTrip().highlights = currentTrip().highlights.filter((h) => h.id !== state.selectedHighlightId);
         state.snack = { text: "Highlight deleted" };
       }
       state.dialog = null;
@@ -1249,9 +1505,167 @@ function bindStatic() {
   const title = document.getElementById("tripTitle");
   if (title) {
     title.addEventListener("input", () => {
-      state.tripTitle = title.value;
+      if (currentTrip()) currentTrip().title = title.value;
     });
   }
+  const tripNotes = document.getElementById("tripNotes");
+  if (tripNotes) {
+    tripNotes.addEventListener("input", () => {
+      if (currentTrip()) currentTrip().notes = tripNotes.value;
+    });
+  }
+  $app().querySelectorAll("[data-open-trip]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.currentTripId = el.dataset.openTrip;
+      state.tab = "home";
+      state.screen = "home";
+      state.fabOpen = false;
+      state.sheetId = null;
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-back-trips]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.currentTripId = null;
+      state.screen = "trips";
+      state.fabOpen = false;
+      state.sheetId = null;
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-create-trip]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.tripForm = blankTripForm();
+      state.screen = "createTrip";
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-close-trip-form]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.screen = "trips";
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-save-trip]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const titleValue = state.tripForm.title.trim();
+      if (!titleValue) return;
+      if (state.tripForm.editingId) {
+        const trip = state.trips.find((t) => t.id === state.tripForm.editingId);
+        if (trip) {
+          trip.title = titleValue;
+          trip.startDate = state.tripForm.startDate;
+          trip.endDate = state.tripForm.endDate || null;
+          trip.notes = state.tripForm.notes;
+        }
+        state.screen = "trips";
+        state.snack = { text: "Trip updated" };
+      } else {
+        const id = `t${Date.now()}`;
+        state.trips.push({
+          id,
+          title: titleValue,
+          startDate: state.tripForm.startDate,
+          endDate: state.tripForm.endDate || null,
+          notes: state.tripForm.notes,
+          stops: [],
+          highlights: [],
+        });
+        state.currentTripId = id;
+        state.tab = "home";
+        state.screen = "home";
+        state.snack = { text: "Trip started" };
+      }
+      render();
+    });
+  });
+  const newTripTitle = document.getElementById("newTripTitle");
+  if (newTripTitle) {
+    newTripTitle.addEventListener("input", () => {
+      state.tripForm.title = newTripTitle.value;
+      state.tripForm.dirty = true;
+      renderKeepTripTitle();
+    });
+  }
+  const newTripStart = document.getElementById("newTripStart");
+  if (newTripStart) {
+    newTripStart.addEventListener("change", () => {
+      state.tripForm.startDate = newTripStart.value;
+    });
+  }
+  const newTripEnd = document.getElementById("newTripEnd");
+  if (newTripEnd) {
+    newTripEnd.addEventListener("change", () => {
+      state.tripForm.endDate = newTripEnd.value;
+    });
+  }
+  const newTripNotes = document.getElementById("newTripNotes");
+  if (newTripNotes) {
+    newTripNotes.addEventListener("input", () => {
+      state.tripForm.notes = newTripNotes.value;
+    });
+  }
+  const tripSearch = document.getElementById("tripSearch");
+  if (tripSearch) {
+    tripSearch.addEventListener("input", () => {
+      state.tripQuery = tripSearch.value;
+      render();
+      const again = document.getElementById("tripSearch");
+      if (again) {
+        again.focus();
+        again.setSelectionRange(again.value.length, again.value.length);
+      }
+    });
+  }
+  $app().querySelectorAll("[data-units]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.units = el.dataset.units;
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-trip-overflow]").forEach((el) => {
+    el.addEventListener("click", (event) => {
+      event.stopPropagation();
+      state.pendingDeleteTripId = el.dataset.tripOverflow;
+      state.dialog = "trip-overflow";
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-edit-trip]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const trip = state.trips.find((t) => t.id === state.pendingDeleteTripId);
+      state.dialog = null;
+      if (!trip) return;
+      state.tripForm = {
+        title: trip.title,
+        startDate: trip.startDate,
+        endDate: trip.endDate || "",
+        notes: trip.notes,
+        dirty: false,
+        editingId: trip.id,
+      };
+      state.screen = "createTrip";
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-confirm-delete-trip]").forEach((el) => {
+    el.addEventListener("click", () => {
+      state.trips = state.trips.filter((t) => t.id !== state.pendingDeleteTripId);
+      if (state.currentTripId === state.pendingDeleteTripId) state.currentTripId = null;
+      state.pendingDeleteTripId = null;
+      state.dialog = null;
+      state.screen = "trips";
+      state.snack = { text: "Trip deleted" };
+      render();
+    });
+  });
+  $app().querySelectorAll("[data-directions]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const [lat, lng] = el.dataset.directions.split(",");
+      state.snack = { text: `Google Maps would open ${lat}, ${lng}` };
+      render();
+    });
+  });
 }
 
 function applyCurrentLocation() {
@@ -1269,6 +1683,20 @@ function applyCurrentLocation() {
     state.snack = { text: "Centered on current location" };
   }
   render();
+}
+
+function renderKeepTripTitle() {
+  const title = state.tripForm.title;
+  const notes = state.tripForm.notes;
+  render();
+  const n = document.getElementById("newTripTitle");
+  const t = document.getElementById("newTripNotes");
+  if (n) {
+    n.value = title;
+    n.focus();
+    n.setSelectionRange(title.length, title.length);
+  }
+  if (t) t.value = notes;
 }
 
 function renderKeepHighlight() {
@@ -1307,15 +1735,10 @@ document.getElementById("toggleTheme").addEventListener("click", () => {
 });
 
 document.getElementById("toggleEmpty").addEventListener("click", () => {
-  state.empty = !state.empty;
-  if (state.empty) {
-    state.stops = [];
-    state.highlights = [];
-  } else {
-    state.stops = structuredClone(seedStops);
-    state.highlights = structuredClone(seedHighlights);
-  }
-  state.screen = "home";
+  state.emptyList = !state.emptyList;
+  state.trips = state.emptyList ? [] : createSeedTrips();
+  state.currentTripId = null;
+  state.screen = "trips";
   state.tab = "home";
   state.fabOpen = false;
   state.snack = null;
@@ -1326,23 +1749,26 @@ document.getElementById("toggleEmpty").addEventListener("click", () => {
 
 document.getElementById("resetProto").addEventListener("click", () => {
   state.theme = "light";
-  state.empty = false;
+  state.emptyList = false;
+  state.units = "mi";
   state.tab = "home";
-  state.screen = "home";
+  state.screen = "trips";
   state.fabOpen = false;
   state.mapFilter = "All";
   state.timelineFilter = "All";
   state.timelineQuery = "";
+  state.tripQuery = "";
   state.dialog = null;
   state.snack = null;
   state.photo = null;
   state.sheetId = null;
   state.locationGranted = false;
-  state.tripTitle = "Coast to Coast 2026";
-  state.stops = structuredClone(seedStops);
-  state.highlights = structuredClone(seedHighlights);
+  state.currentTripId = null;
+  state.pendingDeleteTripId = null;
+  state.trips = createSeedTrips();
   state.stopForm = blankStopForm();
   state.highlightForm = blankHighlightForm();
+  state.tripForm = blankTripForm();
   render();
 });
 

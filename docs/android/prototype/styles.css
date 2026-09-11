@@ -522,6 +522,65 @@ button {
   color: var(--on-primary);
 }
 
+.fab.list-fab {
+  bottom: 24px;
+}
+
+.trip-card {
+  background: var(--surface-container);
+  border-radius: 16px;
+  padding: 8px 8px 14px 16px;
+  margin-bottom: 12px;
+}
+
+.trip-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.trip-open {
+  flex: 1;
+  text-align: left;
+  padding: 8px 0;
+}
+
+.trip-open strong,
+.trip-open span {
+  display: block;
+}
+
+.trip-open span,
+.trip-meta {
+  color: var(--on-surface-variant);
+  font-size: 0.8rem;
+}
+
+.trip-meta {
+  margin: 0 8px 0 0;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--surface-high);
+  border-radius: 20px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.segmented button {
+  height: 36px;
+  border-radius: 16px;
+  font-weight: 650;
+  font-size: 0.85rem;
+}
+
+.segmented button.active {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+
 .scrim {
   position: absolute;
   inset: 0;
