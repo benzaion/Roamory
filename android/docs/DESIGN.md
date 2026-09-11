@@ -4,6 +4,8 @@ Native Android conversion of the iOS CoastTrip app: an offline USA coast-to-coas
 
 This document is the design source of truth for the first Android build. A clickable Material 3 prototype lives in [`prototype/index.html`](prototype/index.html).
 
+All Android work stays under [`android/`](../). The iOS app is isolated in [`ios/`](../../ios/). The Kotlin/Compose Gradle root will be `android/` (sibling of this `docs/` folder), not the repository root.
+
 ---
 
 ## 1. What we are converting
@@ -581,6 +583,8 @@ Photo files are orphan-cleaned when the parent stop/highlight is deleted (parity
 ## 11. Recommended stack (for the implementation pass)
 
 Not this PR — captured so the UX does not fight the architecture later.
+
+Gradle root: **`android/`** (this folder’s parent). Do not create an Android module next to `ios/CoastTrip.xcodeproj`.
 
 - Language: Kotlin 2.x
 - UI: Jetpack Compose, Material 3 (`androidx.compose.material3`)

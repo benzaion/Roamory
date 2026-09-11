@@ -1,46 +1,27 @@
 # CoastTrip
 
-Offline iOS app for tracking a USA coast-to-coast road trip — locations, photos, and area highlights.
+Offline road-trip journal. Same product, two native clients. They live in **separate top-level folders** so iOS and Android files never share a tree.
 
-## Requirements
+```
+ios/          SwiftUI + SwiftData (shipping iOS app)
+android/      Material 3 design now; Kotlin / Compose next
+```
 
-- Xcode 15+ (iOS 17+ target for SwiftData)
-- iPhone or Simulator
+| Open this | For |
+|---|---|
+| [`ios/README.md`](ios/README.md) | Xcode project, run on iPhone |
+| [`android/README.md`](android/README.md) | Android UX spec, clickable prototype, future Gradle app |
 
-## Open & Run
+Do not add shared source under the repo root. Platform code, resources, and build files stay inside `ios/` or `android/` only.
 
-1. Open `CoastTrip.xcodeproj` in Xcode
-2. Select an iPhone simulator or your device
-3. Press **Run** (⌘R)
+## Why one repo, two folders
 
-## Features
+- **One product history.** Issues and PRs can mention both clients without a second remote.
+- **Hard isolation.** An Android PR cannot accidentally edit `CoastTrip/*.swift` unless someone crosses the folder on purpose.
+- **Independent builds.** Xcode opens `ios/CoastTrip.xcodeproj`. Android Studio will open `android/` as its own Gradle root.
 
-- **Home** — trip dashboard with stats (stops, highlights, photos, miles)
-- **Map** — route polyline, stop pins, color-coded highlight markers
-- **Timeline** — chronological feed grouped by day
-- **Add Stop / Highlight** — GPS check-in, notes, photo library or camera
-- **Detail views** — edit notes, manage photos, delete entries
-
-All data is stored on-device (SwiftData + local photo files). Works fully offline after install.
-
-## Android conversion (in design)
-
-Native Android UX is specified in [`docs/android/DESIGN.md`](docs/android/DESIGN.md). A clickable Material 3 prototype is at [`docs/android/prototype/index.html`](docs/android/prototype/index.html).
+Two separate GitHub repositories also work if you later want different permissions or CI. This monorepo is the simpler default while the Android app is still being designed.
 
 ## Privacy
 
-The app requests:
-
-- **Location (When In Use)** — to save check-in coordinates
-- **Photo Library** — to attach existing photos
-- **Camera** — to take photos in the field
-
-## Project Structure
-
-```
-CoastTrip/
-├── Models/          SwiftData models
-├── Views/           SwiftUI screens
-├── Services/        Location & photo storage
-└── Assets.xcassets
-```
+Both clients stay on-device. They request location (when in use), photos, and camera.

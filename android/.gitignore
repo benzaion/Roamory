@@ -1,0 +1,14 @@
+# Gradle / Android Studio (used once the Compose project lands)
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.cxx/
+captures/
+outputs/
+*.apk
+*.aab
+*.ap_
+*.dex
+.DS_Store
