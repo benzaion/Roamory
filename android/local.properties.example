@@ -1,0 +1,4 @@
+## Copy to local.properties (gitignored).
+sdk.dir=/path/to/Android/sdk
+## Optional. Without it, the map uses the offline pin canvas fallback.
+MAPS_API_KEY=

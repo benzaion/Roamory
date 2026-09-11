@@ -1,30 +1,42 @@
 # CoastTrip for Android
 
-Native Android client. This folder is the **only** place Android files belong.
+Native Kotlin / Jetpack Compose client. This folder is the **Gradle root** and the only place Android files belong.
 
-iOS lives in [`../ios/`](../ios/). Do not put Gradle, Kotlin, or Android resources next to the Xcode project.
+iOS lives in [`../ios/`](../ios/).
 
-## Now
+## Open in Android Studio
 
-UX spec and a clickable Material 3 prototype (no app binary yet):
+1. **File → Open** and choose this `android/` directory (not the repo root).
+2. Copy `local.properties.example` to `local.properties`.
+3. Set `sdk.dir` to your Android SDK.
+4. Optional: set `MAPS_API_KEY` for Google Maps. Without it, the map tab uses an offline pin canvas and Directions still opens the Google Maps app.
 
-- [`docs/DESIGN.md`](docs/DESIGN.md) — product and UX source of truth
-- [`docs/prototype/index.html`](docs/prototype/index.html) — phone-framed flows
+## Command line
 
-Open the HTML file in a browser.
+```bash
+cd android
+./gradlew testDebugUnitTest assembleDebug
+```
 
-Locked decisions: many trips, Google Maps, miles and kilometers, Directions via Google Maps, Android extras (search, chips, settings, captions).
+The debug APK is `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Next
+## What shipped
 
-The Kotlin / Compose project will be created **in this folder** as a standard Gradle root:
+- Trip list: start, search, edit, delete (no auto-seeded trip)
+- Trip workspace: Home, Map, Timeline
+- Log / edit / delete stops and highlights
+- Photo Picker (no storage permission)
+- Just-in-time location rationale
+- Miles / kilometers and theme in Settings
+- Directions via Google Maps
+- Room + DataStore, last opened trip restored after process death
+
+## Layout
 
 ```
 android/
-├── docs/                design + prototype (already here)
-├── app/                 future application module
+├── app/                 Compose application
+├── docs/                UX spec + HTML prototype
 ├── build.gradle.kts
 └── settings.gradle.kts
 ```
-
-Android Studio: **Open** the `android/` directory, not the repo root.

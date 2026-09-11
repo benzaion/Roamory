@@ -10,7 +10,7 @@ android/      Material 3 design now; Kotlin / Compose next
 | Open this | For |
 |---|---|
 | [`ios/README.md`](ios/README.md) | Xcode project, run on iPhone |
-| [`android/README.md`](android/README.md) | Android UX spec, clickable prototype, future Gradle app |
+| [`android/README.md`](android/README.md) | Kotlin/Compose app, UX spec, clickable prototype |
 
 Do not add shared source under the repo root. Platform code, resources, and build files stay inside `ios/` or `android/` only.
 
@@ -18,7 +18,7 @@ Do not add shared source under the repo root. Platform code, resources, and buil
 
 - **One product history.** Issues and PRs can mention both clients without a second remote.
 - **Hard isolation.** An Android PR cannot accidentally edit `CoastTrip/*.swift` unless someone crosses the folder on purpose.
-- **Independent builds.** Xcode opens `ios/CoastTrip.xcodeproj`. Android Studio will open `android/` as its own Gradle root.
+- **Independent builds.** Xcode opens `ios/CoastTrip.xcodeproj`. Android Studio opens `android/` as its own Gradle root (`./gradlew assembleDebug`).
 
 Two separate GitHub repositories also work if you later want different permissions or CI. This monorepo is the simpler default while the Android app is still being designed.
 
