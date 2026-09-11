@@ -1,9 +1,13 @@
 package com.coasttrip.app.ui.place
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import java.io.File
+import java.util.UUID
 import com.coasttrip.app.data.location.DeviceLocation
 import com.coasttrip.app.domain.Highlight
 import com.coasttrip.app.domain.HighlightCategory
@@ -78,8 +85,29 @@ fun PlaceFormScreen(
     var lng by remember { mutableStateOf(initialStop?.longitude ?: initialHighlight?.longitude) }
     var photos by remember { mutableStateOf<List<Uri>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) {
         photos = it
+    }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        if (ok) pendingCameraUri?.let { photos = photos + it }
+    }
+    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) pendingCameraUri?.let { takePicture.launch(it) }
+    }
+    fun launchCamera() {
+        val file = File(context.cacheDir, "camera/${UUID.randomUUID()}.jpg").apply {
+            parentFile?.mkdirs()
+            createNewFile()
+        }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        pendingCameraUri = uri
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            takePicture.launch(uri)
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
     }
     val canSave = lat != null && lng != null && (!isHighlight || name.isNotBlank())
     val camera = rememberCameraPositionState {
@@ -223,9 +251,12 @@ fun PlaceFormScreen(
                 minLines = 3,
             )
             Text("Photos", style = MaterialTheme.typography.titleSmall)
-            OutlinedButton(onClick = {
-                picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }) { Text("Choose photos") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = {
+                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Text("Choose photos") }
+                OutlinedButton(onClick = { launchCamera() }) { Text("Take photo") }
+            }
             if (photos.isNotEmpty()) {
                 Text("${photos.size} photo(s) selected", style = MaterialTheme.typography.bodySmall)
             }
