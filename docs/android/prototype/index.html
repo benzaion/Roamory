@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CoastTrip Android — Material 3 prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Roboto+Flex:opsz,wght@8..144,400;8..144,500;8..144,600;8..144,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page">
+    <aside class="brief">
+      <p class="eyebrow">CoastTrip · Android conversion</p>
+      <h1>Material 3 design prototype</h1>
+      <p class="lede">
+        Click through the phone like a device. This is the proposed native Android UX —
+        not an iOS clone. Full specification is in
+        <a href="../DESIGN.md">DESIGN.md</a>.
+      </p>
+      <ol class="tour">
+        <li>Start on <strong>Home</strong>. Open the FAB and log a stop.</li>
+        <li>Switch to <strong>Map</strong>. Tap a pin, then open the peek sheet.</li>
+        <li>Open <strong>Timeline</strong>, then a highlight, then overflow → Delete.</li>
+        <li>Use the toolbar to try dark theme and the first-launch empty state.</li>
+      </ol>
+      <div class="assumptions">
+        <h2>Locked for this pass</h2>
+        <ul>
+          <li>Single seeded trip</li>
+          <li>Offline, no account</li>
+          <li>FAB menu instead of stacked iOS buttons</li>
+          <li>Full-screen add forms</li>
+          <li>Just-in-time location rationale</li>
+        </ul>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div class="proto-toolbar" role="toolbar" aria-label="Prototype controls">
+        <button type="button" id="toggleTheme" class="proto-btn">Dark theme</button>
+        <button type="button" id="toggleEmpty" class="proto-btn">Empty trip</button>
+        <button type="button" id="resetProto" class="proto-btn">Reset</button>
+      </div>
+
+      <div class="phone" aria-label="Pixel-framed CoastTrip prototype">
+        <div class="phone-speaker" aria-hidden="true"></div>
+        <div id="device" class="device" data-theme="light">
+          <header class="status-bar" aria-hidden="true">
+            <span id="clock">9:41</span>
+            <span class="status-icons">
+              <span class="material-symbols-outlined">wifi</span>
+              <span class="material-symbols-outlined">signal_cellular_alt</span>
+              <span class="material-symbols-outlined">battery_full</span>
+            </span>
+          </header>
+          <div id="app" class="app"></div>
+        </div>
+      </div>
+      <p class="caption">Phone frame · 412 × 892 logical pixels · Material 3 Expressive</p>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

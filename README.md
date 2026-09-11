@@ -23,6 +23,10 @@ Offline iOS app for tracking a USA coast-to-coast road trip — locations, photo
 
 All data is stored on-device (SwiftData + local photo files). Works fully offline after install.
 
+## Android conversion (in design)
+
+Native Android UX is specified in [`docs/android/DESIGN.md`](docs/android/DESIGN.md). A clickable Material 3 prototype is at [`docs/android/prototype/index.html`](docs/android/prototype/index.html).
+
 ## Privacy
 
 The app requests:
