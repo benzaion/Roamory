@@ -280,7 +280,7 @@ function screenHtml() {
 function tabShell() {
   const body =
     state.tab === "home" ? homeHtml() : state.tab === "map" ? mapHtml() : timelineHtml();
-  const showFab = state.tab === "home" || state.tab === "map";
+  const showFab = (state.tab === "home" || state.tab === "map") && !state.sheetId;
   return `
     ${body}
     ${showFab ? fabHtml() : ""}
@@ -1318,6 +1318,9 @@ document.getElementById("toggleEmpty").addEventListener("click", () => {
   state.screen = "home";
   state.tab = "home";
   state.fabOpen = false;
+  state.snack = null;
+  state.sheetId = null;
+  state.dialog = null;
   render();
 });
 
