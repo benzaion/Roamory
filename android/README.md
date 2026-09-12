@@ -11,6 +11,15 @@ iOS lives in [`../ios/`](../ios/).
 3. Set `sdk.dir` to your Android SDK.
 4. Optional: set `MAPS_API_KEY` for Google Maps. Without it, the map tab uses an offline pin canvas and Directions still opens the Google Maps app.
 
+If Android Studio reports **Incompatible Gradle JVM version**, the IDE picked Java 25. This project uses Gradle 8.11.1, which only runs on Java 8–23. Point Gradle at **JDK 21** (or 17):
+
+1. **Android Studio → Settings** (or the link on the error banner).
+2. **Build, Execution, Deployment → Build Tools → Gradle**.
+3. **Gradle JDK** → **21** (Download JDK if it is not listed). Do not leave it on 25.
+4. Apply, then **File → Sync Project with Gradle Files**.
+
+The app still compiles to Java 17. Only the JVM that *runs* Gradle needs to change.
+
 ## Command line
 
 ```bash
