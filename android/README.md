@@ -20,6 +20,8 @@ If Android Studio reports **Incompatible Gradle JVM version**, the IDE picked Ja
 
 The app still compiles to Java 17. Only the JVM that *runs* Gradle needs to change.
 
+A follow-up banner about **multiple Gradle daemons** (`JAVA_HOME` vs Gradle JDK) is a warning, not a failure. Android Studio’s app bundle is often Java 25 (`/Applications/Android Studio.app/Contents/jbr`) while Gradle must stay on 21 (`~/Library/Java/JavaVirtualMachines/jbr-21…`). Keep the Gradle JDK on 21, click **Do not show this warning again**, and continue. Do not point Gradle at the Studio.app `jbr`.
+
 ## Command line
 
 ```bash
